@@ -1,7 +1,12 @@
-# ENGAGE 0.6.0 — Android-first pilot candidate
+# ENGAGE — Your Intelligence First Officer
 
 <p align="center"><img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="144" alt="ENGAGE Android app icon — gold and dark navy" /></p>
 
+**Logical. Inquisitive. Proactive.**
+
+ENGAGE is envisioned as a proactive digital first officer operating under your command, coordinating your applications, communications, information and daily objectives through user-authorized integrations. More than a chatbot, its mission is to anticipate needs, identify opportunities and assist with execution while preserving user control.
+
+**Current release:** v0.6.0 Android-first APAC pilot candidate. Windows is the secondary platform. The proactive orchestration capabilities are a product vision, not a claim of completed pilot functionality.
 
 MIT-licensed original source; no additional subscription required by this companion. Philippines/APAC initial pilot, international number support. Windows remains phase two. This is not a compiled APK, certified security product or approved app-store release. Existing Google/Microsoft apps handle their own authentication. No direct cloud APIs or automatic synchronization are implemented.
 
