@@ -33,3 +33,9 @@ All core cases must pass or have documented noncritical exceptions; any unexpect
 - [ ] Verify original scan cue plays only after preview starts, respects silent/DND and toggle, and stops promptly on exit.
 - [ ] Optional face indicator is off by default; test hardware-supported face count and mouth landmark availability, unsupported mode and disabling. No identity, lip reading, emotion inference, recording, storage, upload or model access. Obtain consent before pointing camera at others.
 - [ ] Live AI visual reasoning and speech/gesture fusion are separate future features requiring explicit user-approved frames and a validated model integration.
+
+## Visual intelligence acceptance (source candidate)
+- [ ] Analyze a user-selected frame using the bundled image-labeling model in airplane mode; test several ordinary objects, a person, poor lighting, and unknown objects. Verify results are phrased as tentative, generic observations; no identity or sensitive inference.
+- [ ] Check preview orientation and model input on both cameras. Confirm no file is created, no frame upload occurs, and merged manifest excludes INTERNET permission. Review dependency licenses and privacy before commercial distribution.
+- [ ] Check offline English speech voice selection, speech-rate/pitch, mute toggle, missing voice fallback, rapid scan switching, and stop/back/home during inference. No spoken output after leaving the scanner.
+- [ ] Verify complete build, lint and independent device acceptance before public release. Image labeling is not a general vision-language model or material-composition analysis.
