@@ -54,6 +54,9 @@ public class MainActivity extends Activity {
         text("Systems online, Captain.",16);
         Switch startupSound=new Switch(this);startupSound.setText("Startup sound");startupSound.setTextColor(Color.WHITE);startupSound.setChecked(getPreferences(MODE_PRIVATE).getBoolean("startupCue",true));panel.addView(startupSound);startupSound.setOnCheckedChangeListener((v,enabled)->{getPreferences(MODE_PRIVATE).edit().putBoolean("startupCue",enabled).apply();if(!enabled)stopStartupCue();});
         button("Open ChatGPT / SPOCK",()->openPackage("com.openai.chatgpt"));
+        voiceStatus=text("Microphone idle.",14);
+        button("Listen once — voice command",this::listen);
+        button("Type a command — no microphone required",this::typedCommand);
         button("Choose ENGAGE as digital assistant (experimental)",this::requestAssistant);
         text("Voice setup — optional local calibration",20);
         text("Select your English variety and read the eight phrases. Calibration does not record a voiceprint or retrain the Android model.",14);
@@ -97,7 +100,7 @@ public class MainActivity extends Activity {
         phrase=new EditText(this);phrase.setSingleLine(true);phrase.setText(getPreferences(MODE_PRIVATE).getString("phrase","Mr. Spock, analysis"));phrase.setTextColor(Color.WHITE);panel.addView(phrase,new LinearLayout.LayoutParams(-1,-2));
         button("Save wake phrase",()->{String p=phrase.getText().toString().trim();if(!p.isEmpty()){getPreferences(MODE_PRIVATE).edit().putString("phrase",p).apply();voiceStatus.setText("Phrase saved.");}});
         button("Listen once",this::listen);button("Stop microphone",this::stop);
-        voiceStatus=text("Microphone idle.",14);
+
         button("Open ChatGPT",()->openPackage("com.openai.chatgpt"));
         text("This companion does not scan other apps' private files, diagnose spyware, read message history, or control ChatGPT sessions. A normal report does not prove a device is uncompromised.",13);
         if(state==null)receiveSharedText(getIntent());
@@ -209,6 +212,21 @@ public class MainActivity extends Activity {
     private void settings(String action){try{startActivity(new Intent(action));}catch(Exception ex){startActivity(new Intent(Settings.ACTION_SETTINGS));}}
     private void openPackage(String pkg){try{Intent i=getPackageManager().getLaunchIntentForPackage(pkg);if(i==null){Toast.makeText(this,"Application not available. Use Google Play.",Toast.LENGTH_LONG).show();return;}startActivity(i);}catch(Exception ex){Toast.makeText(this,"Unable to open application.",Toast.LENGTH_LONG).show();}}
     private void share(){Intent i=new Intent(Intent.ACTION_SEND);i.setType("text/plain");i.putExtra(Intent.EXTRA_TEXT,baseline()+"\n\n"+appChanges());startActivity(Intent.createChooser(i,"Share baseline report"));}
+    private void typedCommand(){
+        EditText entry=new EditText(this);
+        entry.setSingleLine(true);
+        entry.setHint("e.g. open ChatGPT");
+        new android.app.AlertDialog.Builder(this).setTitle("Type an ENGAGE command")
+            .setView(entry).setNegativeButton("Cancel",null)
+            .setPositiveButton("Run",(dialog,which)->{
+                String route=CommandRules.route(entry.getText().toString(),
+                    getPreferences(MODE_PRIVATE).getString("phrase","Mr. Spock, analysis"));
+                if("NONE".equals(route)){voiceStatus.setText("No supported command recognized.");return;}
+                stop();
+                voiceStatus.setText("Manual command recognized; review destination before confirming.");
+                routeVoice(route);
+            }).show();
+    }
     private void routeVoice(String route){
         switch(route){
             case "CHATGPT": openPackage("com.openai.chatgpt");break;
