@@ -23,6 +23,15 @@ import android.view.TextureView;
 import android.view.WindowInsets;
 import android.widget.*;
 import java.util.Collections;
+import java.util.Locale;
+import android.graphics.Bitmap;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.Voice;
+import com.google.mlkit.vision.common.InputImage;
+import com.google.mlkit.vision.label.ImageLabeling;
+import com.google.mlkit.vision.label.ImageLabeler;
+import com.google.mlkit.vision.label.ImageLabel;
+import com.google.mlkit.vision.label.defaults.ImageLabelerOptions;
 
 /** Foreground-only, explicitly started camera preview. No recording or network transmission. */
 public final class VisualScannerActivity extends Activity {
@@ -35,6 +44,13 @@ public final class VisualScannerActivity extends Activity {
     private CameraCaptureSession session;
     private Surface output;
     private ToneGenerator tone;
+    private TextView observation;
+    private Button analyzeButton;
+    private Switch spokenReport;
+    private TextToSpeech speech;
+    private boolean speechReady, analyzing;
+    private int analysisSerial;
+    private String pendingReport;
     private int generation, facing = CameraCharacteristics.LENS_FACING_BACK;
     private boolean foreground, requested, opening;
     private Size previewSize;
@@ -57,7 +73,7 @@ public final class VisualScannerActivity extends Activity {
         root.requestApplyInsets();
         TextView title = label("ENGAGE • VISUAL SCANNER",22);
         title.setTextColor(Color.rgb(255,204,63)); root.addView(title);
-        root.addView(label("Captain, select a camera and start the scan. Live preview only; nothing is recorded or transmitted.",14));
+        root.addView(label("Captain, select a camera and start the scan. Analyze one frame locally when requested. No images are saved or shared.",14));
         LinearLayout controls = new LinearLayout(this);
         Button front = new Button(this), rear = new Button(this), stop = new Button(this);
         front.setText("Front / face"); rear.setText("Rear / scene"); stop.setText("Stop");
@@ -77,6 +93,13 @@ public final class VisualScannerActivity extends Activity {
         root.addView(faceCheck);
         status=label("Camera off. Select Front or Rear to begin.",14);root.addView(status);
         faceStatus=label("Face analysis off.",13);root.addView(faceStatus);
+        spokenReport=new Switch(this);spokenReport.setText("Speak observations");spokenReport.setTextColor(Color.WHITE);
+        spokenReport.setChecked(getPreferences(MODE_PRIVATE).getBoolean("spokenReport",true));
+        spokenReport.setOnCheckedChangeListener((v,on)->{getPreferences(MODE_PRIVATE).edit().putBoolean("spokenReport",on).apply();if(!on){pendingReport=null;if(speech!=null)speech.stop();}});
+        root.addView(spokenReport);
+        analyzeButton=new Button(this);analyzeButton.setText("Analyze visible scene");analyzeButton.setEnabled(false);
+        analyzeButton.setOnClickListener(v->analyzeFrame());root.addView(analyzeButton);
+        observation=label("Intelligence report: awaiting scan.",14);observation.setMaxLines(4);root.addView(observation);
         preview=new TextureView(this);
         root.addView(preview,new LinearLayout.LayoutParams(-1,0,1));
         preview.setSurfaceTextureListener(new TextureView.SurfaceTextureListener(){
@@ -90,7 +113,7 @@ public final class VisualScannerActivity extends Activity {
     private TextView label(String text,int size){TextView v=new TextView(this);v.setText(text);v.setTextSize(size);v.setTextColor(Color.WHITE);v.setPadding(0,dp(3),0,dp(3));return v;}
     @Override protected void onResume(){super.onResume();foreground=true;}
     @Override protected void onPause(){foreground=false;closeScan("Camera off. Select a camera to resume.");super.onPause();}
-    @Override protected void onDestroy(){closeScan("Scanner closed.");super.onDestroy();}
+    @Override protected void onDestroy(){closeScan("Scanner closed.");if(speech!=null){speech.shutdown();speech=null;}super.onDestroy();}
 
     private void startScan(int lens){
         closeScan("Preparing camera…");facing=lens;requested=true;
@@ -108,7 +131,10 @@ public final class VisualScannerActivity extends Activity {
     }
 
     private void closeScan(String message){
-        generation++;requested=false;opening=false;stopTone();
+        generation++;analysisSerial++;requested=false;opening=false;analyzing=false;stopTone();
+        pendingReport=null;if(speech!=null)speech.stop();
+        if(analyzeButton!=null)analyzeButton.setEnabled(false);
+        if(observation!=null)observation.setText("Intelligence report: awaiting scan.");
         CameraCaptureSession oldSession=session;session=null;if(oldSession!=null)oldSession.close();
         CameraDevice oldCamera=camera;camera=null;if(oldCamera!=null)oldCamera.close();
         Surface oldSurface=output;output=null;if(oldSurface!=null)oldSurface.release();
@@ -186,6 +212,7 @@ public final class VisualScannerActivity extends Activity {
                             }
                         },ui);
                         preview.setAlpha(1f);
+                        if(analyzeButton!=null)analyzeButton.setEnabled(true);
                         status.setText(facing==CameraCharacteristics.LENS_FACING_FRONT?"Front camera active • local preview":"Rear camera active • local preview");
                         playScanTone();
                     }catch(CameraAccessException|RuntimeException e){closeScan("Preview could not start.");}
@@ -209,6 +236,74 @@ public final class VisualScannerActivity extends Activity {
         matrix.postRotate(angle,cx,cy);
         if(facing==CameraCharacteristics.LENS_FACING_FRONT)matrix.postScale(-1,1,cx,cy);
         preview.setTransform(matrix);
+    }
+
+
+    private void analyzeFrame(){
+        if(!foreground||!requested||session==null||preview==null||!preview.isAvailable()||analyzing)return;
+        final Bitmap frame;
+        try{frame=preview.getBitmap(640,480);}catch(RuntimeException e){observation.setText("Captain, the optical frame is unavailable.");return;}
+        if(frame==null){observation.setText("Captain, no optical frame is available.");return;}
+        analyzing=true;analyzeButton.setEnabled(false);stopTone();if(speech!=null)speech.stop();
+        final int ticket=generation, serial=++analysisSerial;
+        observation.setText("Analyzing optical data locally…");
+        ImageLabeler created=null;
+        try{
+            created=ImageLabeling.getClient(new ImageLabelerOptions.Builder().setConfidenceThreshold(0.70f).build());
+            final ImageLabeler engine=created;
+            engine.process(InputImage.fromBitmap(frame,0))
+                .addOnSuccessListener(labels->{
+                    if(!foreground||ticket!=generation||serial!=analysisSerial)return;
+                    java.util.ArrayList<ImageLabel> ranked=new java.util.ArrayList<>(labels);
+                    ranked.sort((a,b)->Float.compare(b.getConfidence(),a.getConfidence()));
+                    String report="Captain, the available optical data are insufficient for a reliable classification.";
+                    for(ImageLabel result:ranked){
+                        String raw=result.getText().trim();
+                        if(raw.isEmpty())continue;
+                        String lower=raw.toLowerCase(Locale.ROOT);
+                        // Only generic person descriptions; never infer identity or sensitive attributes.
+                        if(lower.matches(".*\\b(person|people|human|face|selfie|portrait|man|woman|girl|boy|child|male|female|skin|model)\\b.*")){
+                            report="Captain, a person appears to be in view. Further visual detail would require closer analysis.";break;
+                        }
+                        if(lower.matches(".*\\b(sexy|sexual|religion|race|ethnicity|disability|pregnancy|pregnant|nationality|orientation|political)\\b.*"))continue;
+                        report="Curious, Captain. The image appears consistent with: "+raw+". This is a preliminary visual classification, not a verified identification.";break;
+                    }
+                    observation.setText(report);speakReport(report);
+                })
+                .addOnFailureListener(error->{if(foreground&&ticket==generation&&serial==analysisSerial)observation.setText("Captain, local analysis was unsuccessful. Please try again.");})
+                .addOnCompleteListener(task->{
+                    try{engine.close();}finally{frame.recycle();}
+                    if(ticket==generation&&serial==analysisSerial){analyzing=false;if(analyzeButton!=null)analyzeButton.setEnabled(foreground&&session!=null);}
+                });
+        }catch(RuntimeException e){
+            if(created!=null)created.close();frame.recycle();analyzing=false;analyzeButton.setEnabled(foreground&&session!=null);
+            observation.setText("Captain, the local recognition system is unavailable.");
+        }
+    }
+    private void speakReport(String report){
+        if(!foreground||spokenReport==null||!spokenReport.isChecked())return;
+        if(speechReady&&speech!=null){speech.speak(report,TextToSpeech.QUEUE_FLUSH,null,"engage-report-"+analysisSerial);return;}
+        pendingReport=report;
+        if(speech!=null)return;
+        speech=new TextToSpeech(this,code->ui.post(()->{
+            if(speech==null||isDestroyed())return;
+            if(code==TextToSpeech.SUCCESS){
+                try{
+                    Voice chosen=null;
+                    if(speech.getVoices()!=null)for(Voice voice:speech.getVoices()){
+                        if(!voice.isNetworkConnectionRequired()&&"en".equals(voice.getLocale().getLanguage())){
+                            if(chosen==null||voice.getQuality()>chosen.getQuality())chosen=voice;
+                        }
+                    }
+                    if(chosen!=null&&speech.setVoice(chosen)==TextToSpeech.SUCCESS){
+                        speech.setPitch(0.87f);speech.setSpeechRate(0.88f);speechReady=true;
+                    }
+                }catch(RuntimeException ignored){}
+            }
+            String next=pendingReport;pendingReport=null;
+            if(speechReady&&foreground&&requested&&spokenReport.isChecked()&&next!=null)speakReport(next);
+            else if(!speechReady&&foreground&&observation!=null)observation.append("\nOffline English speech voice unavailable; text report retained.");
+        }));
     }
 
     // Original diagnostic pulse sequence; no franchise audio is included.
