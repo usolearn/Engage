@@ -34,6 +34,9 @@ The cloud workflows build a debug-signed APK, verify its signature and write SHA
 - Device baseline is limited to visible launcher apps and selected settings; changes are not evidence of compromise. No spyware detection claim.
 - The app does not store message drafts in saved instance state, has backup disabled, and requests no direct Internet permission. User-initiated target apps may use the network under their own policies.
 
+## Visual scanner (source implementation; device testing pending)
+Open the Visual scanner and explicitly select the front (face) or rear (scene) camera. The foreground live preview uses Android Camera2; an optional hardware face-count and mouth-landmark availability indicator runs locally where supported. No images or video are saved, transmitted or sent to an AI model. The original short diagnostic sound can be switched off and respects silent mode and Do Not Disturb. Camera closes when the user leaves the scanner. Live AI scene understanding, mouth-motion recognition and multimodal assistant integration remain future work.
+
 ## Build / release evidence
 See VALIDATION.md. No APK has been generated in this environment. Neither GitHub nor Azure workflow was executed here. Do not mark a release as installed until the owner confirms the physical test results.
 
