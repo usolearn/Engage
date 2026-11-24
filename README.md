@@ -1,5 +1,8 @@
 # ENGAGE 0.6.0 — Android-first pilot candidate
 
+<p align="center"><img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="144" alt="ENGAGE Android app icon — gold and dark navy" /></p>
+
+
 MIT-licensed original source; no additional subscription required by this companion. Philippines/APAC initial pilot, international number support. Windows remains phase two. This is not a compiled APK, certified security product or approved app-store release. Existing Google/Microsoft apps handle their own authentication. No direct cloud APIs or automatic synchronization are implemented.
 
 ## Obtain an installation file
