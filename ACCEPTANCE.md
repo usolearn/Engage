@@ -26,3 +26,10 @@ All core cases must pass or have documented noncritical exceptions; any unexpect
 - [ ] Confirm locale and completion flag persist, locale change resets calibration, and no voiceprint, raw audio, or training transcript is saved by ENGAGE.
 - [ ] Test low-confidence commands, unknown confidence, background noise, accents, Bluetooth microphone and interrupted sessions; ensure no automatic sends. The 0.60 confidence threshold is provisional, not an accuracy guarantee.
 - [ ] Android vocabulary bias is provider-dependent; calibration tests recognition, not acoustic model retraining or identity verification.
+
+## Visual scanner acceptance
+- [ ] Opening the scanner does not activate camera or request permission until Front or Rear is selected. Deny permission; other features remain usable.
+- [ ] Test front and rear camera, orientation, framing, mirrored front view, switching, Stop, Back, Home, screen lock, incoming interruption, rotation and camera-in-use error. No camera active after leaving the scanner; explicit restart required.
+- [ ] Verify original scan cue plays only after preview starts, respects silent/DND and toggle, and stops promptly on exit.
+- [ ] Optional face indicator is off by default; test hardware-supported face count and mouth landmark availability, unsupported mode and disabling. No identity, lip reading, emotion inference, recording, storage, upload or model access. Obtain consent before pointing camera at others.
+- [ ] Live AI visual reasoning and speech/gesture fusion are separate future features requiring explicit user-approved frames and a validated model integration.
