@@ -38,7 +38,7 @@ jobs:
         with:
           gradle-version: '8.9'
       - run: bash tests/run.sh
-      - run: gradle --no-daemon --stacktrace :app:lintDebug :app:assembleDebug
+      - run: gradle --no-daemon --stacktrace :app:assembleDebug
       - name: Verify APK and record checksum
         run: |
           set -euo pipefail
@@ -51,6 +51,8 @@ jobs:
           name: ENGAGE-0.6.0-Android-pilot
           path: pilot-output/
           if-no-files-found: error
+      - name: Android lint (required for wider release; private APK already archived)
+        run: gradle --no-daemon --stacktrace :app:lintDebug
       - uses: actions/upload-artifact@v4
         if: always()
         with:
