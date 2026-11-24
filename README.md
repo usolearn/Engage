@@ -4,6 +4,8 @@
 
 **Logical. Inquisitive. Proactive.**
 
+*A Current Works Advisory product.*
+
 ENGAGE is envisioned as a proactive digital first officer operating under your command, coordinating your applications, communications, information and daily objectives through user-authorized integrations. More than a chatbot, its mission is to anticipate needs, identify opportunities and assist with execution while preserving user control.
 
 **Current release:** v0.6.0 Android-first APAC pilot candidate. Windows is the secondary platform. The proactive orchestration capabilities are a product vision, not a claim of completed pilot functionality.
