@@ -69,11 +69,11 @@ public class MainActivity extends Activity {
         text("Permission is requested only when needed. No automatic sending, background microphone, or access to private app data.",14);
         text("Communications / Phone · SMS · WhatsApp",22);
         text("Choose a contact or enter a number. Open the phone dialer, or compose a message for SMS or WhatsApp. Review and confirm in the destination app.",14);
-        smsNumber=new EditText(this);smsNumber.setId(1001);smsNumber.setSaveEnabled(false);smsNumber.setSingleLine(true);smsNumber.setInputType(InputType.TYPE_CLASS_PHONE);smsNumber.setHint("Phone number");smsNumber.setTextColor(Color.WHITE);smsNumber.setHintTextColor(Color.LTGRAY);panel.addView(smsNumber,new LinearLayout.LayoutParams(-1,-2));
+        smsNumber=new EditText(this);smsNumber.setId(android.view.View.generateViewId());smsNumber.setSaveEnabled(false);smsNumber.setSingleLine(true);smsNumber.setInputType(InputType.TYPE_CLASS_PHONE);smsNumber.setHint("Phone number");smsNumber.setTextColor(Color.WHITE);smsNumber.setHintTextColor(Color.LTGRAY);panel.addView(smsNumber,new LinearLayout.LayoutParams(-1,-2));
         button("Choose contact",this::pickPhone);
         button("Convert Philippine mobile number to +63",()->{String number=CommandRules.phMobile(smsNumber.getText().toString());if(number==null)smsNumber.setError("Enter a Philippine mobile number starting 09, or +639.");else smsNumber.setText(number);});
         button("Open phone dialer",this::openDialer);
-        smsBody=new EditText(this);smsBody.setId(1002);smsBody.setSaveEnabled(false);smsBody.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE|InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);smsBody.setMinLines(3);smsBody.setHint("Message text");smsBody.setTextColor(Color.WHITE);smsBody.setHintTextColor(Color.LTGRAY);panel.addView(smsBody,new LinearLayout.LayoutParams(-1,-2));
+        smsBody=new EditText(this);smsBody.setId(android.view.View.generateViewId());smsBody.setSaveEnabled(false);smsBody.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE|InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);smsBody.setMinLines(3);smsBody.setHint("Message text");smsBody.setTextColor(Color.WHITE);smsBody.setHintTextColor(Color.LTGRAY);panel.addView(smsBody,new LinearLayout.LayoutParams(-1,-2));
         button("Dictate message (on-device)",()->listen(true));
         button("Review in Google Messages",this::composeSms);
         button("Review in WhatsApp",()->composeWhatsApp("com.whatsapp"));
