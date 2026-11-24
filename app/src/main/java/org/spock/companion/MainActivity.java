@@ -53,6 +53,7 @@ public class MainActivity extends Activity {
         text("A Current Works Advisory product • Android pilot v0.6.0",13);
         text("Systems online, Captain.",16);
         Switch startupSound=new Switch(this);startupSound.setText("Startup sound");startupSound.setTextColor(Color.WHITE);startupSound.setChecked(getPreferences(MODE_PRIVATE).getBoolean("startupCue",true));panel.addView(startupSound);startupSound.setOnCheckedChangeListener((v,enabled)->{getPreferences(MODE_PRIVATE).edit().putBoolean("startupCue",enabled).apply();if(!enabled)stopStartupCue();});
+        button("Visual scanner — front / rear camera",()->startActivity(new Intent(this,VisualScannerActivity.class)));
         button("Open ChatGPT / SPOCK",()->openPackage("com.openai.chatgpt"));
         button("Choose ENGAGE as digital assistant (experimental)",this::requestAssistant);
         text("Voice setup — optional local calibration",20);
