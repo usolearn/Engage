@@ -1,0 +1,34 @@
+# Import the Android-only archive at the root of a private ENGAGE Git repository.
+# Manual first pilot. Hosted-agent availability and free quota depend on the account.
+trigger: none
+pr: none
+pool:
+  vmImage: ubuntu-latest
+steps:
+  - checkout: self
+    persistCredentials: false
+  - task: JavaToolInstaller@0
+    inputs:
+      versionSpec: '17'
+      jdkArchitectureOption: x64
+      jdkSourceOption: PreInstalled
+  - bash: |
+      set -euo pipefail
+      sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      work=$(mktemp -d)
+      cd "$work"
+      curl --fail --location --retry 2 -O https://services.gradle.org/distributions/gradle-8.9-bin.zip
+      curl --fail --location --retry 2 -o expected.sha https://services.gradle.org/distributions/gradle-8.9-bin.zip.sha256
+      printf '%s  gradle-8.9-bin.zip\n' "$(cat expected.sha)" | sha256sum -c -
+      unzip -q gradle-8.9-bin.zip
+      cd "$(Build.SourcesDirectory)"
+      bash tests/run.sh
+      "$work/gradle-8.9/bin/gradle" --no-daemon :app:lintDebug :app:assembleDebug
+      dest="$(Build.ArtifactStagingDirectory)/pilot"
+      mkdir -p "$dest"
+      cp app/build/outputs/apk/debug/app-debug.apk "$dest/ENGAGE-0.6.0-pilot.apk"
+      "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$dest/ENGAGE-0.6.0-pilot.apk" | tee "$dest/signature.txt"
+      (cd "$dest" && sha256sum ENGAGE-0.6.0-pilot.apk > SHA256SUMS.txt)
+    displayName: Build, lint and verify Android pilot
+  - publish: $(Build.ArtifactStagingDirectory)/pilot
+    artifact: ENGAGE-0.6.0-Android-pilot

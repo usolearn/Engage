@@ -1,0 +1,40 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <queries>
+        <intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent>
+        <package android:name="com.openai.chatgpt"/>
+        <package android:name="com.android.vending"/>
+        <package android:name="com.google.android.apps.messaging"/>
+        <package android:name="com.whatsapp"/>
+        <package android:name="com.whatsapp.w4b"/>
+        <intent><action android:name="android.intent.action.DIAL"/><data android:scheme="tel"/></intent>
+        <intent><action android:name="android.intent.action.SENDTO"/><data android:scheme="smsto"/></intent>
+        <intent><action android:name="android.speech.RecognitionService"/></intent>
+        <package android:name="com.microsoft.office.outlook"/>
+        <package android:name="com.microsoft.skydrive"/>
+        <package android:name="com.microsoft.office.officehubrow"/>
+        <package android:name="com.microsoft.office.word"/>
+        <package android:name="com.microsoft.office.excel"/>
+        <package android:name="com.microsoft.office.powerpoint"/>
+        <package android:name="com.microsoft.office.onenote"/>
+        <package android:name="com.microsoft.teams"/>
+        <package android:name="com.microsoft.sharepoint"/>
+        <package android:name="com.google.android.gm"/>
+        <package android:name="com.google.android.apps.dynamite"/>
+        <package android:name="com.google.android.calendar"/>
+        <package android:name="com.google.android.apps.docs"/>
+        <package android:name="com.google.android.apps.docs.editors.docs"/>
+        <package android:name="com.google.android.apps.docs.editors.sheets"/>
+        <package android:name="com.google.android.apps.docs.editors.slides"/>
+        <package android:name="com.google.android.contacts"/>
+        <package android:name="com.google.android.apps.tachyon"/>
+    </queries>
+    <application android:label="ENGAGE" android:icon="@mipmap/ic_launcher" android:theme="@android:style/Theme.Material.NoActionBar" android:allowBackup="false" android:usesCleartextTraffic="false">
+        <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop">
+            <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+            <intent-filter><action android:name="android.intent.action.ASSIST"/><category android:name="android.intent.category.DEFAULT"/></intent-filter>
+            <intent-filter><action android:name="android.intent.action.SEND"/><category android:name="android.intent.category.DEFAULT"/><data android:mimeType="text/plain"/></intent-filter>
+        </activity>
+    </application>
+</manifest>

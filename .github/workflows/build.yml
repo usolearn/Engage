@@ -1,0 +1,41 @@
+name: ENGAGE Android pilot APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - run: bash tests/run.sh
+      - run: gradle --no-daemon :app:lintDebug :app:assembleDebug
+      - name: Verify APK and record checksum
+        run: |
+          set -euo pipefail
+          mkdir -p pilot-output
+          cp app/build/outputs/apk/debug/app-debug.apk pilot-output/ENGAGE-0.6.0-pilot.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs pilot-output/ENGAGE-0.6.0-pilot.apk | tee pilot-output/signature.txt
+          (cd pilot-output && sha256sum ENGAGE-0.6.0-pilot.apk > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ENGAGE-0.6.0-Android-pilot
+          path: pilot-output/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lint-report
+          path: app/build/reports/lint-results-debug.*
