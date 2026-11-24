@@ -5,7 +5,3 @@ android {
     defaultConfig { applicationId 'org.spock.companion'; minSdk 31; targetSdk 35; versionCode 6; versionName '0.6.0' }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
-
-dependencies {
-    implementation 'com.google.mlkit:image-labeling:17.0.9'
-}
