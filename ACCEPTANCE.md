@@ -18,3 +18,11 @@ Record device model, Android version, APK SHA-256, build run ID, signing identit
 
 ## Release gate
 All core cases must pass or have documented noncritical exceptions; any unexpected message transmission, account access, crash on startup, permission escalation or incorrect recipient blocks wider release. Owner approves the next phase. Windows is secondary and not part of Android acceptance.
+
+## Voice calibration acceptance
+- [ ] On first launch, voice setup is visible; it can be skipped and never requests the microphone until the user taps a listening control.
+- [ ] Select English recognition locale (US, UK, Philippines, Australia, India, Canada); test available on-device language packs, including unavailable-locale failure handling.
+- [ ] Read all eight prompts. Check recognized text against expected phrase, verify microphone signal display, retry mismatches, and confirm calibration never routes a command.
+- [ ] Confirm locale and completion flag persist, locale change resets calibration, and no voiceprint, raw audio, or training transcript is saved by ENGAGE.
+- [ ] Test low-confidence commands, unknown confidence, background noise, accents, Bluetooth microphone and interrupted sessions; ensure no automatic sends. The 0.60 confidence threshold is provisional, not an accuracy guarantee.
+- [ ] Android vocabulary bias is provider-dependent; calibration tests recognition, not acoustic model retraining or identity verification.
