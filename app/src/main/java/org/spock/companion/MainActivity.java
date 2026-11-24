@@ -238,22 +238,18 @@ public class MainActivity extends Activity {
                 nm.getCurrentInterruptionFilter() != android.app.NotificationManager.INTERRUPTION_FILTER_ALL ||
                 am.getStreamVolume(android.media.AudioManager.STREAM_SYSTEM) == 0) return;
             final int rate = 24000;
-            short[] pcm = new short[rate * 8 / 5];
-            // Three softly layered, original electronic chords with a gentle fade.
-            double[][] chords = {{196.0, 293.665, 440.0}, {220.0, 329.628, 493.883}, {174.614, 261.626, 392.0}};
-            double[] starts = {0.0, 0.38, 0.76};
+            // Original short retro sci-fi sting, not the Star Trek recording or score.
+            short[] pcm = new short[rate * 3 / 4];
+            double phase = 0.0;
             for (int i = 0; i < pcm.length; i++) {
-                double t = (double)i / rate, sum = 0.0;
-                for (int j = 0; j < chords.length; j++) {
-                    double age = t - starts[j];
-                    if (age < 0 || age >= 0.76) continue;
-                    double env = Math.min(1.0, age / 0.045) * Math.pow(1.0 - age / 0.76, 2);
-                    for (double f : chords[j]) {
-                        double p = 2.0 * Math.PI * f * age;
-                        sum += env * (Math.sin(p) + 0.16 * Math.sin(2.0 * p)) / 3.0;
-                    }
-                }
-                pcm[i] = (short)Math.round(Math.max(-1.0, Math.min(1.0, sum * 0.14)) * 32767);
+                double t = (double)i / rate;
+                double frequency = 390.0 + 770.0 * Math.exp(-t * 11.0);
+                phase += 2.0 * Math.PI * frequency / rate;
+                double envelope = Math.min(1.0, t / 0.012) * Math.exp(-t * 6.5)
+                    * Math.min(1.0, (0.75 - t) / 0.08);
+                double sample = envelope * (0.68 * Math.sin(phase)
+                    + 0.22 * Math.sin(phase * 1.43) + 0.10 * Math.sin(phase * 2.08));
+                pcm[i] = (short)Math.round(sample * 0.18 * 32767);
             }
             startupTrack = new android.media.AudioTrack.Builder()
                 .setAudioAttributes(new android.media.AudioAttributes.Builder()
@@ -268,7 +264,7 @@ public class MainActivity extends Activity {
                 startupTrack.write(pcm, 0, pcm.length) != pcm.length) { stopStartupCue(); return; }
             startupTrack.setVolume(0.55f);
             startupTrack.play();
-            startupHandler.postDelayed(releaseStartup, 1800L);
+            startupHandler.postDelayed(releaseStartup, 950L);
         } catch (RuntimeException ignored) { stopStartupCue(); }
     }
 
