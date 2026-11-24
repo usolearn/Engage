@@ -55,6 +55,13 @@ public class MainActivity extends Activity {
         Switch startupSound=new Switch(this);startupSound.setText("Startup sound");startupSound.setTextColor(Color.WHITE);startupSound.setChecked(getPreferences(MODE_PRIVATE).getBoolean("startupCue",true));panel.addView(startupSound);startupSound.setOnCheckedChangeListener((v,enabled)->{getPreferences(MODE_PRIVATE).edit().putBoolean("startupCue",enabled).apply();if(!enabled)stopStartupCue();});
         button("Open ChatGPT / SPOCK",()->openPackage("com.openai.chatgpt"));
         button("Choose ENGAGE as digital assistant (experimental)",this::requestAssistant);
+        text("Voice setup — optional local calibration",20);
+        text("Select your English variety and read the eight phrases. Calibration does not record a voiceprint or retrain the Android model.",14);
+        button("Choose speech language / accent",this::showVoiceLocale);
+        calibrationPrompt=text("",16);
+        if(getPreferences(MODE_PRIVATE).getBoolean("calibrationPassed",false))calibrationStep=CALIBRATION.length;
+        updateCalibrationPrompt("");
+        button("Read calibration phrase / retry",this::startCalibration);
         button("Voice command — listen once",this::listen);
         text("Permission is requested only when needed. No automatic sending, background microphone, or access to private app data.",14);
         text("Communications / Phone · SMS · WhatsApp",22);
@@ -268,16 +275,108 @@ public class MainActivity extends Activity {
         } catch (RuntimeException ignored) { stopStartupCue(); }
     }
 
+
+    // Calibration is a local recognition check, not speaker authentication or model retraining.
+    private TextView calibrationPrompt;
+    private int calibrationStep;
+    private boolean pendingCalibration;
+    private static final String[] CALIBRATION = {
+        "Engage", "Spock", "Curious Captain", "Vulcan",
+        "Logic dictates", "Live long and prosper", "Open workspace", "Open Google Chat"
+    };
+    private static final String[] VOICE_LOCALES = {"en-US","en-GB","en-PH","en-AU","en-IN","en-CA"};
+    private String voiceLocale(){return getPreferences(MODE_PRIVATE).getString("voiceLocale","en-US");}
+    private void showVoiceLocale(){
+        if(listening)return;
+        String[] labels={"US English","British English","Philippine English","Australian English","Indian English","Canadian English"};
+        int current=java.util.Arrays.asList(VOICE_LOCALES).indexOf(voiceLocale());
+        new android.app.AlertDialog.Builder(this).setTitle("Choose recognition language")
+            .setSingleChoiceItems(labels,current,(d,w)->{
+                getPreferences(MODE_PRIVATE).edit().putString("voiceLocale",VOICE_LOCALES[w]).remove("calibrationPassed").apply();
+                calibrationStep=0;updateCalibrationPrompt("");d.dismiss();
+            }).setNegativeButton("Cancel",null).show();
+    }
+    private void updateCalibrationPrompt(String status){
+        if(calibrationPrompt==null)return;
+        boolean complete=calibrationStep>=CALIBRATION.length;
+        String next=complete?"Calibration complete.":("Phrase "+(calibrationStep+1)+" of "+CALIBRATION.length+": "+CALIBRATION[calibrationStep]);
+        calibrationPrompt.setText("Voice language: "+voiceLocale()+"\n"+(status.isEmpty()?"":status+"\n")+next);
+    }
+    private void startCalibration(){
+        if(listening)return;
+        if(calibrationStep>=CALIBRATION.length)calibrationStep=0;
+        updateCalibrationPrompt("Read the phrase naturally.");
+        listen(false,true);
+    }
+
     private boolean pendingDictation;
-    private void listen(){listen(false);}
-    private void listen(boolean dictation){stopStartupCue();if(listening)return;pendingDictation=dictation;if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO},4);return;}
-        if(!SpeechRecognizer.isOnDeviceRecognitionAvailable(this)){voiceStatus.setText("On-device speech unavailable. Open ChatGPT manually.");return;}
-        stop();try{recognizer=SpeechRecognizer.createOnDeviceSpeechRecognizer(this);recognizer.setRecognitionListener(new RecognitionListener(){
-            public void onReadyForSpeech(Bundle b){voiceStatus.setText(dictation?"Listening for message…":"Listening for saved phrase…");}public void onBeginningOfSpeech(){}public void onRmsChanged(float f){}public void onBufferReceived(byte[] b){}public void onEndOfSpeech(){voiceStatus.setText("Checking phrase…");}public void onPartialResults(Bundle b){}public void onEvent(int a,Bundle b){}
-            public void onError(int code){stop();voiceStatus.setText("Recognition ended ("+code+"). Tap Listen once to retry.");}
-            public void onResults(Bundle b){ArrayList<String> results=b.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);if(dictation){String spoken=results==null||results.isEmpty()?"":results.get(0);stop();if(!spoken.isEmpty()){String current=smsBody.getText().toString();smsBody.setText(current.isEmpty()?spoken:current+" "+spoken);}voiceStatus.setText(spoken.isEmpty()?"No message recognized.":"Message dictated. Review before sending.");return;}String route=results==null||results.isEmpty()?"NONE":CommandRules.route(results.get(0),getPreferences(MODE_PRIVATE).getString("phrase","Mr. Spock, analysis"));stop();voiceStatus.setText(route.equals("NONE")?"No supported command recognized.":"Command recognized; review destination before confirming.");routeVoice(route);}
-        });Intent i=new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);i.putExtra(RecognizerIntent.EXTRA_LANGUAGE,"en-US");i.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE,true);listening=true;recognizer.startListening(i);}catch(Exception ex){stop();voiceStatus.setText("Speech recognition unavailable.");}}
-    @Override public void onRequestPermissionsResult(int request,String[] perms,int[] results){super.onRequestPermissionsResult(request,perms,results);if(request==4&&results.length>0){if(results[0]==PackageManager.PERMISSION_GRANTED)listen(pendingDictation);else voiceStatus.setText("Microphone permission denied. All manual controls remain available.");}}
+    private void listen(){listen(false,false);}
+    private void listen(boolean dictation){listen(dictation,false);}
+    private void listen(boolean dictation,boolean calibrate){
+        stopStartupCue();if(listening)return;
+        pendingDictation=dictation;pendingCalibration=calibrate;
+        if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO},4);return;}
+        if(!SpeechRecognizer.isOnDeviceRecognitionAvailable(this)){
+            voiceStatus.setText("On-device speech unavailable. Open ChatGPT manually.");
+            if(calibrate)updateCalibrationPrompt("On-device recognizer unavailable.");
+            return;
+        }
+        stop();
+        try{
+            final SpeechRecognizer session=SpeechRecognizer.createOnDeviceSpeechRecognizer(this);
+            recognizer=session;
+            session.setRecognitionListener(new RecognitionListener(){
+                public void onReadyForSpeech(Bundle b){voiceStatus.setText(calibrate?"Calibration listening…":dictation?"Listening for message…":"Listening for command…");if(calibrate)updateCalibrationPrompt("Listening…");}
+                public void onBeginningOfSpeech(){}
+                public void onRmsChanged(float f){if(calibrate&&recognizer==session)updateCalibrationPrompt("Microphone signal: "+String.format(Locale.US,"%.1f dB (relative)",f));}
+                public void onBufferReceived(byte[] b){}
+                public void onEndOfSpeech(){if(recognizer==session)voiceStatus.setText("Checking phrase…");}
+                public void onPartialResults(Bundle b){}
+                public void onEvent(int a,Bundle b){}
+                public void onError(int code){if(recognizer!=session)return;stop();voiceStatus.setText("Recognition ended ("+code+"). Tap Listen once to retry.");if(calibrate)updateCalibrationPrompt("Recognition ended ("+code+"). Retry or choose another speech language.");}
+                public void onResults(Bundle b){
+                    if(recognizer!=session)return;
+                    ArrayList<String> results=b.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                    String spoken=results==null||results.isEmpty()?"":results.get(0);
+                    float[] scores=b.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES);
+                    stop();
+                    if(calibrate){
+                        if(calibrationStep<CALIBRATION.length&&CommandRules.normalized(spoken).equals(CommandRules.normalized(CALIBRATION[calibrationStep]))){
+                            calibrationStep++;
+                            if(calibrationStep==CALIBRATION.length)getPreferences(MODE_PRIVATE).edit().putBoolean("calibrationPassed",true).apply();
+                            updateCalibrationPrompt("Recognized correctly: "+spoken);
+                        }else updateCalibrationPrompt("Heard: "+(spoken.isEmpty()?"(nothing)":spoken)+". Retry the same phrase.");
+                        return;
+                    }
+                    if(dictation){
+                        if(!spoken.isEmpty()){String current=smsBody.getText().toString();smsBody.setText(current.isEmpty()?spoken:current+" "+spoken);}
+                        voiceStatus.setText(spoken.isEmpty()?"No message recognized.":"Message dictated. Review before sending.");return;
+                    }
+                    String route=CommandRules.route(spoken,getPreferences(MODE_PRIVATE).getString("phrase","Mr. Spock, analysis"));
+                    if(scores!=null&&scores.length>0&&scores[0]>=0&&scores[0]<0.60f){voiceStatus.setText("Uncertain recognition: "+spoken+". Please repeat.");return;}
+                    voiceStatus.setText(route.equals("NONE")?"No supported command recognized. Heard: "+spoken:"Command recognized; review destination before confirming.");
+                    routeVoice(route);
+                }
+            });
+            Intent i=new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+            i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+            i.putExtra(RecognizerIntent.EXTRA_LANGUAGE,voiceLocale());
+            i.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE,true);
+            if(Build.VERSION.SDK_INT>=33&&!calibrate&&!dictation){
+                ArrayList<String> bias=new ArrayList<>(java.util.Arrays.asList("Engage","Spock","Vulcan","Captain","open ChatGPT","open workspace","open Google Chat","open dialer","prepare SMS","prepare WhatsApp","security analysis"));
+                bias.add(getPreferences(MODE_PRIVATE).getString("phrase","Mr. Spock, analysis"));
+                i.putStringArrayListExtra(RecognizerIntent.EXTRA_BIASING_STRINGS,bias);
+            }
+            listening=true;session.startListening(i);
+        }catch(Exception ex){stop();voiceStatus.setText("Speech recognition unavailable.");if(calibrate)updateCalibrationPrompt("Speech recognition unavailable.");}
+    }
+    @Override public void onRequestPermissionsResult(int request,String[] perms,int[] results){
+        super.onRequestPermissionsResult(request,perms,results);
+        if(request==4&&results.length>0){
+            if(results[0]==PackageManager.PERMISSION_GRANTED)listen(pendingDictation,pendingCalibration);
+            else {voiceStatus.setText("Microphone permission denied. All manual controls remain available.");if(pendingCalibration)updateCalibrationPrompt("Microphone permission denied.");}
+        }
+    }
     private void stop(){listening=false;SpeechRecognizer old=recognizer;recognizer=null;if(old!=null){old.cancel();old.destroy();}if(voiceStatus!=null)voiceStatus.setText("Microphone idle.");}
     @Override protected void onPause(){stopStartupCue();super.onPause();}
     @Override protected void onStop(){stop();super.onStop();}
