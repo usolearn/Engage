@@ -49,7 +49,10 @@ public class MainActivity extends Activity {
         scroll.setOnApplyWindowInsetsListener((v,insets)->{android.graphics.Insets safe=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout()|WindowInsets.Type.ime());v.setPadding(safe.left,safe.top,safe.right,safe.bottom);return WindowInsets.CONSUMED;});
         scroll.requestApplyInsets();
         TextView name=text("ENGAGE",28);name.setTextColor(accent);
-        text("ANDROID PILOT • v0.6.0",13).setTextColor(accent);
+        text("YOUR INTELLIGENCE FIRST OFFICER",16).setTextColor(accent);
+        text("A Current Works Advisory product • Android pilot v0.6.0",13);
+        text("Systems online, Captain.",16);
+        Switch startupSound=new Switch(this);startupSound.setText("Startup sound");startupSound.setTextColor(Color.WHITE);startupSound.setChecked(getPreferences(MODE_PRIVATE).getBoolean("startupCue",true));panel.addView(startupSound);startupSound.setOnCheckedChangeListener((v,enabled)->{getPreferences(MODE_PRIVATE).edit().putBoolean("startupCue",enabled).apply();if(!enabled)stopStartupCue();});
         button("Open ChatGPT / SPOCK",()->openPackage("com.openai.chatgpt"));
         button("Choose ENGAGE as digital assistant (experimental)",this::requestAssistant);
         button("Voice command — listen once",this::listen);
@@ -92,6 +95,7 @@ public class MainActivity extends Activity {
         text("This companion does not scan other apps' private files, diagnose spyware, read message history, or control ChatGPT sessions. A normal report does not prove a device is uncompromised.",13);
         if(state==null)receiveSharedText(getIntent());
         refresh();
+        if(state==null && getIntent()!=null && Intent.ACTION_MAIN.equals(getIntent().getAction())) playStartupCue();
     }
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);receiveSharedText(intent);}
     private void receiveSharedText(Intent intent){
@@ -209,9 +213,68 @@ public class MainActivity extends Activity {
             case "SECURITY": refresh();break;
         }
     }
+
+    // Original ENGAGE startup cue. No sampled or franchise soundtrack audio.
+    private android.media.AudioTrack startupTrack;
+    private final android.os.Handler startupHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable releaseStartup = this::stopStartupCue;
+    private void stopStartupCue() {
+        startupHandler.removeCallbacks(releaseStartup);
+        android.media.AudioTrack track = startupTrack;
+        startupTrack = null;
+        if (track != null) {
+            try { track.stop(); } catch (RuntimeException ignored) {}
+            try { track.release(); } catch (RuntimeException ignored) {}
+        }
+    }
+    private void playStartupCue() {
+        stopStartupCue();
+        try {
+            if (!getPreferences(MODE_PRIVATE).getBoolean("startupCue", true)) return;
+            android.media.AudioManager am = getSystemService(android.media.AudioManager.class);
+            android.app.NotificationManager nm = getSystemService(android.app.NotificationManager.class);
+            if (am == null || nm == null ||
+                am.getRingerMode() != android.media.AudioManager.RINGER_MODE_NORMAL ||
+                nm.getCurrentInterruptionFilter() != android.app.NotificationManager.INTERRUPTION_FILTER_ALL ||
+                am.getStreamVolume(android.media.AudioManager.STREAM_SYSTEM) == 0) return;
+            final int rate = 24000;
+            short[] pcm = new short[rate * 8 / 5];
+            // Three softly layered, original electronic chords with a gentle fade.
+            double[][] chords = {{196.0, 293.665, 440.0}, {220.0, 329.628, 493.883}, {174.614, 261.626, 392.0}};
+            double[] starts = {0.0, 0.38, 0.76};
+            for (int i = 0; i < pcm.length; i++) {
+                double t = (double)i / rate, sum = 0.0;
+                for (int j = 0; j < chords.length; j++) {
+                    double age = t - starts[j];
+                    if (age < 0 || age >= 0.76) continue;
+                    double env = Math.min(1.0, age / 0.045) * Math.pow(1.0 - age / 0.76, 2);
+                    for (double f : chords[j]) {
+                        double p = 2.0 * Math.PI * f * age;
+                        sum += env * (Math.sin(p) + 0.16 * Math.sin(2.0 * p)) / 3.0;
+                    }
+                }
+                pcm[i] = (short)Math.round(Math.max(-1.0, Math.min(1.0, sum * 0.14)) * 32767);
+            }
+            startupTrack = new android.media.AudioTrack.Builder()
+                .setAudioAttributes(new android.media.AudioAttributes.Builder()
+                    .setUsage(android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
+                .setAudioFormat(new android.media.AudioFormat.Builder()
+                    .setSampleRate(rate).setEncoding(android.media.AudioFormat.ENCODING_PCM_16BIT)
+                    .setChannelMask(android.media.AudioFormat.CHANNEL_OUT_MONO).build())
+                .setBufferSizeInBytes(pcm.length * 2)
+                .setTransferMode(android.media.AudioTrack.MODE_STATIC).build();
+            if (startupTrack.getState() != android.media.AudioTrack.STATE_INITIALIZED ||
+                startupTrack.write(pcm, 0, pcm.length) != pcm.length) { stopStartupCue(); return; }
+            startupTrack.setVolume(0.55f);
+            startupTrack.play();
+            startupHandler.postDelayed(releaseStartup, 1800L);
+        } catch (RuntimeException ignored) { stopStartupCue(); }
+    }
+
     private boolean pendingDictation;
     private void listen(){listen(false);}
-    private void listen(boolean dictation){if(listening)return;pendingDictation=dictation;if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO},4);return;}
+    private void listen(boolean dictation){stopStartupCue();if(listening)return;pendingDictation=dictation;if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO},4);return;}
         if(!SpeechRecognizer.isOnDeviceRecognitionAvailable(this)){voiceStatus.setText("On-device speech unavailable. Open ChatGPT manually.");return;}
         stop();try{recognizer=SpeechRecognizer.createOnDeviceSpeechRecognizer(this);recognizer.setRecognitionListener(new RecognitionListener(){
             public void onReadyForSpeech(Bundle b){voiceStatus.setText(dictation?"Listening for message…":"Listening for saved phrase…");}public void onBeginningOfSpeech(){}public void onRmsChanged(float f){}public void onBufferReceived(byte[] b){}public void onEndOfSpeech(){voiceStatus.setText("Checking phrase…");}public void onPartialResults(Bundle b){}public void onEvent(int a,Bundle b){}
@@ -220,5 +283,6 @@ public class MainActivity extends Activity {
         });Intent i=new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);i.putExtra(RecognizerIntent.EXTRA_LANGUAGE,"en-US");i.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE,true);listening=true;recognizer.startListening(i);}catch(Exception ex){stop();voiceStatus.setText("Speech recognition unavailable.");}}
     @Override public void onRequestPermissionsResult(int request,String[] perms,int[] results){super.onRequestPermissionsResult(request,perms,results);if(request==4&&results.length>0){if(results[0]==PackageManager.PERMISSION_GRANTED)listen(pendingDictation);else voiceStatus.setText("Microphone permission denied. All manual controls remain available.");}}
     private void stop(){listening=false;SpeechRecognizer old=recognizer;recognizer=null;if(old!=null){old.cancel();old.destroy();}if(voiceStatus!=null)voiceStatus.setText("Microphone idle.");}
+    @Override protected void onPause(){stopStartupCue();super.onPause();}
     @Override protected void onStop(){stop();super.onStop();}
 }
